@@ -11,7 +11,7 @@ To get started with this project, you need to set up your environment and instal
 ### Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/xudong7/rag-test.git
 cd rag-test
 ```
 
