@@ -24,15 +24,6 @@ chromadb_client = chromadb.PersistentClient("./chroma.db")
 chromadb_collection = chromadb_client.get_or_create_collection("rag_test_collection")
 
 def gemini_embed(text: str, store: bool) -> list[float]:
-  """Generate embeddings using the Gemini model.
-
-  Args:
-      text (str): The text to embed.
-      store (bool): Whether to store the embedding.
-
-  Returns:
-      list[float]: The generated embedding.
-  """
   result = google_client.models.embed_content(
     model=EMBEDDING_MODEL,
     contents=text,
@@ -44,17 +35,6 @@ def gemini_embed(text: str, store: bool) -> list[float]:
   return result.embeddings[0].values
 
 def embed(text: str, store: bool) -> list[float]:
-  """Generate embeddings for the given text.
-
-  Args:
-      text (str): The text to embed.
-      store (bool): Whether to store the embedding.
-      retry_count (int, optional): The number of retry attempts. Defaults to 3.
-
-  Returns:
-      list[float]: The generated embedding.
-  """
-  
   # 1. use Gemini embedding
   # return gemini_embed(text, store)
   
@@ -62,8 +42,6 @@ def embed(text: str, store: bool) -> list[float]:
   return embed_model.encode(text, normalize_embeddings=True).tolist()
 
 def create_db() -> None:
-  """Create the database and populate it with document embeddings.
-  """
   print("Creating database...")
   chunks = chunk.get_chunks()
   total_chunks = len(chunks)
@@ -79,15 +57,28 @@ def create_db() -> None:
     
   print("Database creation completed!")
 
+def create_db_from_multiple_docs(file_patterns: list[str] = None, source_dir: str = "data_source") -> None:
+  print(f"Creating database from multiple documents in '{source_dir}' directory...")
+  chunk_infos = chunk.get_chunks_from_multiple_docs(file_patterns, source_dir)
+  total_chunks = len(chunk_infos)
+  
+  for idx, chunk_info in enumerate(chunk_infos):
+    text = chunk_info["text"]
+    source = chunk_info["source"]
+    metadata = chunk_info["metadata"]
+    
+    embedding = embed(text, store=True)
+    chromadb_collection.upsert(
+      ids=str(idx),
+      documents=text,
+      embeddings=embedding,
+      metadatas=metadata
+    )
+    print(f"Successfully processed chunk {idx + 1}/{total_chunks} from {source}")
+    
+  print("Database creation completed!")
+
 def query_db(question: str) -> list[str]:
-  """Query the database for relevant documents based on the question.
-
-  Args:
-      question (str): The question to query.
-
-  Returns:
-      list[str]: A list of relevant documents.
-  """
   question_embedding = embed(question, store=False)
   result = chromadb_collection.query(
     query_embeddings=question_embedding,
@@ -96,21 +87,41 @@ def query_db(question: str) -> list[str]:
   assert result["documents"]
   return result["documents"][0]
 
+def query_db_with_metadata(question: str) -> tuple[list[str], list[dict]]:
+  question_embedding = embed(question, store=False)
+  result = chromadb_collection.query(
+    query_embeddings=question_embedding,
+    n_results=5,
+    include=["documents", "metadatas"]
+  )
+  assert result["documents"]
+  documents = result["documents"][0]
+  metadatas = result["metadatas"][0] if result["metadatas"] else [{}] * len(documents)
+  return documents, metadatas
+
 def get_llm_answer(question: str, context: list[str]) -> str:
-  """Get the answer from the LLM based on the question and context.
-
-  Args:
-      question (str): The question to ask.
-      context (list[str]): The context to provide to the LLM.
-
-  Returns:
-      str: The answer from the LLM.
-  """
   prompt = "Please answer user's question according to context\n"
   prompt += f"Question: {question}\n"
   prompt += "Context:\n"
   for c in context:
     prompt += f"{c}\n"
+    prompt += "-------------\n"
+  
+  print("Generating response...")
+  result = google_client.models.generate_content(
+    model=LLM_MODEL,
+    contents=prompt
+  )
+  
+  return result.text if hasattr(result, 'text') else result
+
+def get_llm_answer_with_sources(question: str, context: list[str], metadatas: list[dict]) -> str:
+  prompt = "Please answer user's question according to context. Include source information when relevant.\n"
+  prompt += f"Question: {question}\n"
+  prompt += "Context:\n"
+  for i, c in enumerate(context):
+    source_info = metadatas[i].get('file_name', 'Unknown') if i < len(metadatas) else 'Unknown'
+    prompt += f"[Source: {source_info}] {c}\n"
     prompt += "-------------\n"
   
   print("Generating response...")
