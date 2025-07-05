@@ -1,5 +1,8 @@
 # RAG Test
 
+P.S. `embed.py` use `time.sleep()` to avoid hitting the Google API rate limit, which makes the script run slower.
+you can adjust the sleep time according to your needs.
+
 ## Overview
 
 This project demonstrates a simple Retrieval-Augmented Generation (RAG) system using a text embedding model. It includes functionality to embed text, store embeddings in a database, and query the database for relevant chunks based on a question.
@@ -15,12 +18,6 @@ git clone https://github.com/xudong7/rag-test.git
 cd rag-test
 ```
 
-### Create a virtual environment and activate it:
-
-```bash
-uv init . -p ${PYTHON_VERSION}
-```
-
 ### Use uv to install the required dependencies:
 
 ```bash
@@ -33,7 +30,7 @@ create the `.env` file and configure the following variables:
 
 ```bash
 # .env
-GOOGLE_API_KEY=AIzaSyB3xpW3loC76XYjcAe4GMKJRCkyZxBwtQ0
+GOOGLE_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ### Run the embedding script to process your text data:

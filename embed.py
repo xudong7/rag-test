@@ -28,7 +28,7 @@ def embed(text: str, store: bool, retry_count: int = 3) -> list[float]:
       }
     )
 
-    time.sleep(2)
+    time.sleep(5)
 
     assert result.embeddings
     assert result.embeddings[0].values
@@ -46,7 +46,7 @@ def create_db() -> None:
       embeddings=embedding
     )
     print(f"Successfully processed chunk {idx + 1}")
-    time.sleep(2)
+    time.sleep(5)
 
 def query_db(question: str) -> list[str]:
   question_embedding = embed(question, store=False)
