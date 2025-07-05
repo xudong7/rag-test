@@ -7,6 +7,8 @@ you can adjust the sleep time according to your needs.
 
 This project demonstrates a simple Retrieval-Augmented Generation (RAG) system using a text embedding model. It includes functionality to embed text, store embeddings in a database, and query the database for relevant chunks based on a question.
 
+![result](image.png)
+
 ## Getting Started
 
 To get started with this project, you need to set up your environment and install the required dependencies. Follow the steps below:
