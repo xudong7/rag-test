@@ -5,20 +5,45 @@ import time
 from dotenv import load_dotenv
 from google import genai
 from google.genai.errors import ClientError
+from sentence_transformers import SentenceTransformer
 
 # 加载环境变量
 load_dotenv()
 
-# 配置Google API key
+# Google API key
 API_KEY = os.getenv("GOOGLE_API_KEY")
 EMBEDDING_MODEL = "gemini-embedding-exp-03-07"
 LLM_MODEL = "gemini-2.5-flash-preview-05-20"
-google_client = genai.Client(api_key=API_KEY)
 
+# Embedding models
+google_client = genai.Client(api_key=API_KEY)
+embed_model = SentenceTransformer("BAAI/bge-small-zh-v1.5")
+
+# Vector database
 chromadb_client = chromadb.PersistentClient("./chroma.db")
 chromadb_collection = chromadb_client.get_or_create_collection("rag_test_collection")
 
-def embed(text: str, store: bool, retry_count: int = 3) -> list[float]:
+def gemini_embed(text: str, store: bool) -> list[float]:
+  """Generate embeddings using the Gemini model.
+
+  Args:
+      text (str): The text to embed.
+      store (bool): Whether to store the embedding.
+
+  Returns:
+      list[float]: The generated embedding.
+  """
+  result = google_client.models.embed_content(
+    model=EMBEDDING_MODEL,
+    contents=text,
+    config={
+      "task_type": "RETRIEVAL_DOCUMENT" if store else "RETRIEVAL_QUERY"
+    }
+  )
+  time.sleep(5)
+  return result.embeddings[0].values
+
+def embed(text: str, store: bool) -> list[float]:
   """Generate embeddings for the given text.
 
   Args:
@@ -29,20 +54,12 @@ def embed(text: str, store: bool, retry_count: int = 3) -> list[float]:
   Returns:
       list[float]: The generated embedding.
   """
-  for attempt in range(retry_count):
-    result = google_client.models.embed_content(
-      model=EMBEDDING_MODEL,
-      contents=text,
-      config={
-        "task_type": "RETRIEVAL_DOCUMENT" if store else "RETRIEVAL_QUERY"
-      }
-    )
-
-    time.sleep(5)
-
-    assert result.embeddings
-    assert result.embeddings[0].values
-    return result.embeddings[0].values
+  
+  # 1. use Gemini embedding
+  # return gemini_embed(text, store)
+  
+  # 2. use SentenceTransformer embedding
+  return embed_model.encode(text, normalize_embeddings=True).tolist()
 
 def create_db() -> None:
   """Create the database and populate it with document embeddings.
@@ -59,10 +76,8 @@ def create_db() -> None:
       embeddings=embedding
     )
     print(f"Successfully processed chunk {idx + 1}")
-    time.sleep(5)
     
   print("Database creation completed!")
-  time.sleep(5)
 
 def query_db(question: str) -> list[str]:
   """Query the database for relevant documents based on the question.
@@ -106,21 +121,5 @@ def get_llm_answer(question: str, context: list[str]) -> str:
   
   return result.text if hasattr(result, 'text') else result
 
-if __name__ == '__main__':
-  # 问题列表
-  question_list = [
-    "请说说文章作者的三下乡要做的事情",
-    "作者大三有什么安排？",
-    "总体来看，作者对于未来的规划和目标是什么？",
-  ]
-  
-  # 创建数据库
-  # create_db()
-
-  # 查询数据库并获取答案
-  for question in question_list:
-    print(f"\nQuerying: {question}")
-    chunks = query_db(question)
-    answer = get_llm_answer(question, chunks)
-    print(f"Answer: {answer}\n")
-    time.sleep(5)
+if __name__ == "__main__":
+  print(embed("你好，世界！", store=True))    
